@@ -1,6 +1,10 @@
 @echo off
+setlocal EnableDelayedExpansion
 title Buhlovarka Auto Flasher
 cd /d "%~dp0"
+
+set "FW_DIR=%~dp0firmware_cache"
+if not exist "%FW_DIR%" mkdir "%FW_DIR%"
 
 echo ===================================================================
 echo     Buhlovarka / HelloDistiller Firmware Flasher
@@ -8,45 +12,39 @@ echo     Repository: github.com/geminibitok-oss/buhlovarka-release
 echo ===================================================================
 echo.
 
-set "FW_DIR=%~dp0firmware_cache"
-if not exist "%FW_DIR%" mkdir "%FW_DIR%"
-
-echo [1/3] Checking latest release from GitHub...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main/version.txt', '%FW_DIR%\remote_version.txt')" >nul 2>nul
-
-set "NEED_UPDATE=0"
-if exist "%FW_DIR%\remote_version.txt" (
-    if not exist "%FW_DIR%\version.txt" (
-        set "NEED_UPDATE=1"
-    ) else (
-        fc "%FW_DIR%\version.txt" "%FW_DIR%\remote_version.txt" >nul 2>nul
-        if errorlevel 1 set "NEED_UPDATE=1"
-    )
-)
-
-if "%NEED_UPDATE%"=="1" (
-    echo [INFO] New version detected on GitHub! Downloading fresh binaries...
-    if exist "%FW_DIR%\bootloader.bin" del /q "%FW_DIR%\*.bin" >nul 2>nul
-    move /y "%FW_DIR%\remote_version.txt" "%FW_DIR%\version.txt" >nul 2>nul
-) else (
-    if exist "%FW_DIR%\remote_version.txt" del /q "%FW_DIR%\remote_version.txt" >nul 2>nul
-)
-
-echo [2/3] Checking firmware files...
-call :download_file "bootloader.bin"
-call :download_file "partitions.bin"
-call :download_file "firmware.bin"
-call :download_file "littlefs.bin"
-call :download_file "mega2560_firmware.hex"
+echo [1/2] Syncing latest firmware from GitHub...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$repo = 'https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main';" ^
+    "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
+    "$wc = New-Object System.Net.WebClient;" ^
+    "$wc.Headers.Add('User-Agent','Mozilla/5.0');" ^
+    "try { $remVer = $wc.DownloadString($repo + '/version.txt').Trim() } catch { $remVer = '' };" ^
+    "$locVer = if (Test-Path '%FW_DIR%\version.txt') { (Get-Content '%FW_DIR%\version.txt' -Raw).Trim() } else { '' };" ^
+    "if ($remVer -and ($remVer -ne $locVer)) {" ^
+    "    Write-Host ('[INFO] New version available on GitHub: ' + $remVer) -ForegroundColor Cyan;" ^
+    "    Remove-Item '%FW_DIR%\*.bin' -Force -ErrorAction SilentlyContinue;" ^
+    "    [System.IO.File]::WriteAllText('%FW_DIR%\version.txt', $remVer);" ^
+    "};" ^
+    "$files = @('bootloader.bin', 'partitions.bin', 'firmware.bin', 'littlefs.bin', 'mega2560_firmware.hex');" ^
+    "foreach($f in $files) {" ^
+    "    $dst = Join-Path '%FW_DIR%' $f;" ^
+    "    if (-not (Test-Path $dst)) {" ^
+    "        Write-Host ('  Downloading ' + $f + '...') -ForegroundColor Yellow;" ^
+    "        try { $wc.DownloadFile($repo + '/' + $f, $dst); Write-Host ('  [OK] ' + $f) -ForegroundColor Green } catch { Write-Host ('  [ERR] Failed ' + $f) -ForegroundColor Red }" ^
+    "    } else {" ^
+    "        Write-Host ('  [OK] ' + $f + ' (ready)') -ForegroundColor Green" ^
+    "    }" ^
+    "}"
 
 if not exist "%FW_DIR%\firmware.bin" (
     echo.
     echo ===================================================================
-    echo [ERROR] Firmware files not found in %FW_DIR%
+    echo [ERROR] Firmware files could not be downloaded from GitHub!
+    echo Check your internet connection or repository URL.
     echo ===================================================================
     echo Press any key to exit...
     pause >nul
-    goto end
+    exit /b 1
 )
 
 set "VERSION=v2.8.X"
@@ -67,11 +65,13 @@ echo   [4] Flash Arduino Mega 2560 ONLY (mega2560_firmware.hex)
 echo   [5] Flash EVERYTHING (ESP32-C3 clean, then Mega 2560)
 echo   [6] ERASE ESP32-C3 Flash (Full Chip Erase)
 echo   [7] Serial Monitor (View live board logs on 115200 baud)
-echo   [8] Exit
+echo   [8] Force Redownload from GitHub (Clear Cache)
+echo   [9] Exit
 echo.
 
-choice /c 12345678 /n /m "Press key [1-8]: "
-if errorlevel 8 goto end
+choice /c 123456789 /n /m "Press key [1-9]: "
+if errorlevel 9 goto end
+if errorlevel 8 goto redownload
 if errorlevel 7 goto serial_monitor
 if errorlevel 6 goto erase_esp
 if errorlevel 5 goto flash_both
@@ -82,32 +82,17 @@ if errorlevel 1 goto flash_esp_full
 
 goto menu
 
-:download_file
-set "FNAME=%~1"
-if exist "%FW_DIR%\%FNAME%" (
-    echo   [OK] %FNAME% (cached)
-    exit /b 0
-)
-echo   Downloading %FNAME%...
-where curl.exe >nul 2>nul
-if not errorlevel 1 (
-    curl.exe -L -k -A "Mozilla/5.0" -o "%FW_DIR%\%FNAME%" "https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main/%FNAME%" >nul 2>nul
-)
-if not exist "%FW_DIR%\%FNAME%" (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main/%FNAME%', '%FW_DIR%\%FNAME%')" >nul 2>nul
-)
-if exist "%FW_DIR%\%FNAME%" (
-    echo   [OK] %FNAME%
-) else (
-    echo   [FAILED] %FNAME%
-)
-exit /b 0
+:redownload
+echo.
+echo Clearing firmware cache and redownloading...
+del /q "%FW_DIR%\*.bin" "%FW_DIR%\*.hex" "%FW_DIR%\version.txt" >nul 2>nul
+goto menu
 
 :detect_ports
 echo.
 echo Detecting COM ports...
 set "DETECTED_PORT="
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "[System.IO.Ports.SerialPort]::GetPortNames() | Select-Object -First 1"`) do set "DETECTED_PORT=%%P"
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$p = [System.IO.Ports.SerialPort]::GetPortNames() | Where-Object { $_ -ne 'COM1' } | Select-Object -First 1; if(-not $p){ $p = [System.IO.Ports.SerialPort]::GetPortNames() | Select-Object -First 1 }; $p"`) do set "DETECTED_PORT=%%P"
 if defined DETECTED_PORT (
     set "DEFAULT_PORT=%DETECTED_PORT%"
 ) else (
@@ -248,17 +233,15 @@ echo.
 echo --- STEP 1: Flash ESP32-C3 ---
 call :detect_ports
 "%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB --erase-all -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
-
 echo.
 echo --- STEP 2: Flash Arduino Mega 2560 ---
-echo Please connect USB cable to Arduino Mega 2560...
 call :detect_ports
 set "CONF_FLAG="
 if defined AVRCONF set "CONF_FLAG=-C "%AVRCONF%""
 "%AVRDUDE%" %CONF_FLAG% -v -p atmega2560 -c wiring -P %PORT% -b 115200 -D -U flash:w:"%FW_DIR%\mega2560_firmware.hex":i
 echo.
 echo ===================================================
-echo [ALL DONE] Both controllers successfully flashed!
+echo [SUCCESS] Both controllers flashed!
 echo ===================================================
 echo.
 pause
@@ -275,7 +258,7 @@ if errorlevel 1 (
     echo [ERROR] Flash erase failed.
 ) else (
     echo [SUCCESS] Flash memory successfully erased clean!
-    echo Now press [1] in menu to flash fresh firmware.
+    echo Now select [1] to flash fresh firmware and web interface.
 )
 echo.
 pause
@@ -288,6 +271,13 @@ echo ===================================================
 echo   ESP32-C3 Serial Monitor on %PORT% (115200 baud)
 echo   Press Ctrl+C to exit monitor
 echo ===================================================
+if exist "%USERPROFILE%\.platformio\penv\Scripts\python.exe" (
+    "%USERPROFILE%\.platformio\penv\Scripts\python.exe" -m serial.tools.miniterm %PORT% 115200
+    echo.
+    echo [Serial Monitor closed]
+    pause
+    goto menu
+)
 powershell -NoProfile -Command "$p = New-Object System.IO.Ports.SerialPort '%PORT%', 115200; $p.DtrEnable = $true; $p.RtsEnable = $true; $p.Open(); Write-Host '--- Monitor Connected (Press Ctrl+C to exit) ---' -ForegroundColor Green; while($true){ if($p.BytesToRead -gt 0){ [Console]::Write($p.ReadExisting()) } Start-Sleep -Milliseconds 50 }"
 echo.
 echo [Serial Monitor closed]
@@ -296,6 +286,5 @@ goto menu
 
 :end
 echo.
-echo Closing flasher... Press any key.
-pause >nul
-exit
+echo Closing flasher...
+exit /b 0
