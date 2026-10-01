@@ -78,6 +78,10 @@ goto menu
 
 :download_file
 set "FNAME=%~1"
+if exist "%FW_DIR%\%FNAME%" (
+    echo   [OK] %FNAME% (cached, skipping download)
+    exit /b 0
+)
 echo   Downloading %FNAME%...
 curl -s -L -f -o "%FW_DIR%\%FNAME%" "https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main/%FNAME%"
 if not exist "%FW_DIR%\%FNAME%" (
@@ -104,16 +108,18 @@ exit /b 0
 
 :find_esptool
 set "ESPTOOL="
-if exist "%USERPROFILE%\.platformio\penv\Scripts\esptool.exe" set "ESPTOOL=%USERPROFILE%\.platformio\penv\Scripts\esptool.exe"
+if exist "%FW_DIR%\esptool_pkg\esptool-win64\esptool.exe" set "ESPTOOL=%FW_DIR%\esptool_pkg\esptool-win64\esptool.exe"
+if not defined ESPTOOL if exist "%USERPROFILE%\.platformio\penv\Scripts\esptool.exe" set "ESPTOOL=%USERPROFILE%\.platformio\penv\Scripts\esptool.exe"
 if not defined ESPTOOL if exist "%USERPROFILE%\.platformio\penv\Scripts\esptool.py.exe" set "ESPTOOL=%USERPROFILE%\.platformio\penv\Scripts\esptool.py.exe"
 if not defined ESPTOOL (
     where esptool.py >nul 2>nul
     if not errorlevel 1 set "ESPTOOL=esptool.py"
 )
 if not defined ESPTOOL (
-    echo [INFO] Downloading official esptool flasher...
+    echo [INFO] Downloading official esptool flasher (one-time setup)...
     curl -s -L -o "%FW_DIR%\esptool.zip" "https://github.com/espressif/esptool/releases/download/v4.7.0/esptool-v4.7.0-win64.zip"
     powershell -NoProfile -Command "Expand-Archive -Path '%FW_DIR%\esptool.zip' -DestinationPath '%FW_DIR%\esptool_pkg' -Force" >nul 2>nul
+    del "%FW_DIR%\esptool.zip" >nul 2>nul
     if exist "%FW_DIR%\esptool_pkg\esptool-win64\esptool.exe" (
         set "ESPTOOL=%FW_DIR%\esptool_pkg\esptool-win64\esptool.exe"
     )
@@ -164,7 +170,7 @@ call :find_esptool
 call :detect_ports
 echo.
 echo Flashing ESP32-C3 Complete with Flash Erase on %PORT% (DIO 40MHz)...
-"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 --flash_mode dio --flash_freq 40m --flash_size 4MB write_flash --erase-all -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
+"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB --erase-all -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
 echo.
 if errorlevel 1 (
     echo [ERROR] Flashing failed! Check cable and port.
@@ -204,7 +210,7 @@ call :find_esptool
 call :detect_ports
 echo.
 echo Flashing ESP32-C3 Firmware C++ on %PORT%...
-"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 --flash_mode dio --flash_freq 40m write_flash -z 0x10000 "%FW_DIR%\firmware.bin"
+"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m -z 0x10000 "%FW_DIR%\firmware.bin"
 echo.
 if errorlevel 1 (
     echo [ERROR] Flashing firmware failed!
@@ -241,7 +247,7 @@ call :find_avrdude
 echo.
 echo --- STEP 1: Flash ESP32-C3 ---
 call :detect_ports
-"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 --flash_mode dio --flash_freq 40m --flash_size 4MB write_flash --erase-all -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
+"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB --erase-all -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
 
 echo.
 echo --- STEP 2: Flash Arduino Mega 2560 ---
