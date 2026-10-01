@@ -11,13 +11,33 @@ echo.
 set "FW_DIR=%~dp0firmware_cache"
 if not exist "%FW_DIR%" mkdir "%FW_DIR%"
 
-echo [1/3] Checking firmware files...
+echo [1/3] Checking latest release from GitHub...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main/version.txt', '%FW_DIR%\remote_version.txt')" >nul 2>nul
+
+set "NEED_UPDATE=0"
+if exist "%FW_DIR%\remote_version.txt" (
+    if not exist "%FW_DIR%\version.txt" (
+        set "NEED_UPDATE=1"
+    ) else (
+        fc "%FW_DIR%\version.txt" "%FW_DIR%\remote_version.txt" >nul 2>nul
+        if errorlevel 1 set "NEED_UPDATE=1"
+    )
+)
+
+if "%NEED_UPDATE%"=="1" (
+    echo [INFO] New version detected on GitHub! Downloading fresh binaries...
+    if exist "%FW_DIR%\bootloader.bin" del /q "%FW_DIR%\*.bin" >nul 2>nul
+    move /y "%FW_DIR%\remote_version.txt" "%FW_DIR%\version.txt" >nul 2>nul
+) else (
+    if exist "%FW_DIR%\remote_version.txt" del /q "%FW_DIR%\remote_version.txt" >nul 2>nul
+)
+
+echo [2/3] Checking firmware files...
 call :download_file "bootloader.bin"
 call :download_file "partitions.bin"
 call :download_file "firmware.bin"
 call :download_file "littlefs.bin"
 call :download_file "mega2560_firmware.hex"
-call :download_file "version.txt"
 
 if not exist "%FW_DIR%\firmware.bin" (
     echo.
