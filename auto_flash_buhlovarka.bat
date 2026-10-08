@@ -47,7 +47,7 @@ if not exist "%FW_DIR%\firmware.bin" (
     exit /b 1
 )
 
-set "VERSION=v2.8.X"
+set "VERSION=v4.2"
 if exist "%FW_DIR%\version.txt" set /p VERSION=<"%FW_DIR%\version.txt"
 
 :menu
