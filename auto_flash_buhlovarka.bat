@@ -47,7 +47,7 @@ if not exist "%FW_DIR%\firmware.bin" (
     exit /b 1
 )
 
-set "VERSION=v4.2"
+set "VERSION=v2.8.X"
 if exist "%FW_DIR%\version.txt" set /p VERSION=<"%FW_DIR%\version.txt"
 
 :menu
@@ -65,13 +65,13 @@ echo   [4] Flash Arduino Mega 2560 ONLY (mega2560_firmware.hex)
 echo   [5] Flash EVERYTHING (ESP32-C3 clean, then Mega 2560)
 echo   [6] ERASE ESP32-C3 Flash (Full Chip Erase)
 echo   [7] Serial Monitor (View live board logs on 115200 baud)
-echo   [8] Select specific version from GitHub (v2.8, v2.9, v3.0...)
+echo   [8] Force Redownload from GitHub (Clear Cache)
 echo   [9] Exit
 echo.
 
 choice /c 123456789 /n /m "Press key [1-9]: "
 if errorlevel 9 goto end
-if errorlevel 8 goto select_version
+if errorlevel 8 goto redownload
 if errorlevel 7 goto serial_monitor
 if errorlevel 6 goto erase_esp
 if errorlevel 5 goto flash_both
@@ -82,38 +82,10 @@ if errorlevel 1 goto flash_esp_full
 
 goto menu
 
-:select_version
+:redownload
 echo.
-echo ===================================================================
-echo     Fetching release list from GitHub...
-echo ===================================================================
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$url = 'https://api.github.com/repos/geminibitok-oss/buhlovarka-release/releases';" ^
-    "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
-    "$wc = New-Object System.Net.WebClient;" ^
-    "$wc.Headers.Add('User-Agent','Mozilla/5.0');" ^
-    "try { $json = $wc.DownloadString($url) | ConvertFrom-Json; Write-Host 'Available releases on GitHub:' -ForegroundColor Yellow; foreach($r in $json) { Write-Host ('  - ' + $r.tag_name + ' (' + $r.name + ')') -ForegroundColor Cyan } } catch { Write-Host 'Could not reach GitHub Releases API. You can enter version tag manually (e.g. v2.9, v2.8, v3.0)' -ForegroundColor DarkYellow }"
-echo.
-set "CHOSEN_TAG="
-set /p CHOSEN_TAG="Enter version to download (e.g. v2.9 or main): "
-if "%CHOSEN_TAG%"=="" goto menu
-echo.
-echo Downloading version %CHOSEN_TAG% from GitHub...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$tag = '%CHOSEN_TAG%';" ^
-    "$base = if ($tag -eq 'main') { 'https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main' } else { 'https://github.com/geminibitok-oss/buhlovarka-release/releases/download/' + $tag };" ^
-    "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
-    "$wc = New-Object System.Net.WebClient;" ^
-    "$wc.Headers.Add('User-Agent','Mozilla/5.0');" ^
-    "Remove-Item '%FW_DIR%\*.bin' -Force -ErrorAction SilentlyContinue;" ^
-    "$files = @('bootloader.bin', 'partitions.bin', 'firmware.bin', 'littlefs.bin', 'mega2560_firmware.hex');" ^
-    "foreach($f in $files) {" ^
-    "    try { $wc.DownloadFile($base + '/' + $f, '%FW_DIR%\' + $f); Write-Host ('  [OK] ' + $f) -ForegroundColor Green } catch { Write-Host ('  [WARN] ' + $f + ' not in release asset, trying main...') -ForegroundColor DarkGray; try { $wc.DownloadFile('https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main/' + $f, '%FW_DIR%\' + $f); Write-Host ('  [OK] ' + $f) -ForegroundColor Green } catch {} }" ^
-    "};" ^
-    "[System.IO.File]::WriteAllText('%FW_DIR%\version.txt', $tag);"
-echo.
-echo Version %CHOSEN_TAG% downloaded! Now you can flash it with option [1], [2], or [3].
-pause
+echo Clearing firmware cache and redownloading...
+del /q "%FW_DIR%\*.bin" "%FW_DIR%\*.hex" "%FW_DIR%\version.txt" >nul 2>nul
 goto menu
 
 :detect_ports
@@ -189,7 +161,7 @@ echo.
 echo ===================================================
 echo Flashing ESP32-C3 SuperMini on %PORT%...
 echo ===================================================
-"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB --erase-all -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
+"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
 echo.
 if errorlevel 1 (
     echo [ERROR] Flashing failed. Check cable and port.
@@ -260,7 +232,7 @@ call :find_avrdude
 echo.
 echo --- STEP 1: Flash ESP32-C3 ---
 call :detect_ports
-"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB --erase-all -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
+"%ESPTOOL%" --chip esp32c3 --port %PORT% --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB -z 0x0 "%FW_DIR%\bootloader.bin" 0x8000 "%FW_DIR%\partitions.bin" 0x10000 "%FW_DIR%\firmware.bin" 0x290000 "%FW_DIR%\littlefs.bin"
 echo.
 echo --- STEP 2: Flash Arduino Mega 2560 ---
 call :detect_ports

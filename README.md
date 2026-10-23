@@ -1,19 +1,14 @@
-# Бухловарка / HelloDistiller ESP32-C3 + Arduino Mega 2560
+# Бухловарка / HelloDistiller ESP32 / ESP32-C3 + Arduino Mega 2560
 
-**Текущая версия релиза:** `v4.9`  
-**Дата сборки:** `2026-10-22 08:59 UTC`
+**Текущая версия релиза:** `v2.0`  
+**Дата сборки:** `2026-10-23 16:28 UTC`
 
 ## Содержимое репозитория:
-* `firmware.bin` - Прошивка ESP32-C3 Web Bridge (`v4.9`)
-* `littlefs.bin` - Файловая система веб-интерфейса
-* `bootloader.bin` - Загрузчик ESP32-C3
-* `partitions.bin` - Таблица разделов памяти
+* `firmware.bin` - Прошивка ESP32-C3 Web Bridge (`v2.0`)
+* `littlefs.bin` - Веб-интерфейс LittleFS для ESP32-C3
+* `esp32_firmware.bin` - Прошивка классического ESP32 (WROOM/DevKit)
+* `esp32_littlefs.bin` - Веб-интерфейс LittleFS для классического ESP32
 * `mega2560_firmware.hex` - Прошивка автоматики Arduino Mega 2560
 * `version.txt` - Текущий номер версии
-* `flash_esp32c3.bat` - Скрипт быстрой прошивки в 1 клик
-
-## Как прошить ESP32-C3:
-1. Подключите ESP32-C3 по кабелю USB к компьютеру.
-2. Запустите файл `flash_esp32c3.bat`.
-3. Подключитесь к Wi-Fi сети `Buhlovarka_C3` (пароль `12345678`).
-4. Откройте в браузере: `http://192.168.4.1`
+* `flash_esp32c3.bat` - Скрипт прошивки ESP32-C3
+* `flash_esp32_classic.bat` - Скрипт прошивки классического ESP32
