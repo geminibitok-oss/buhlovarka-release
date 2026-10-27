@@ -1,10 +1,10 @@
 # Бухловарка / HelloDistiller ESP32 / ESP32-C3 + Arduino Mega 2560
 
-**Текущая версия релиза:** `v2.2`  
-**Дата сборки:** `2026-10-27 07:17 UTC`
+**Текущая версия релиза:** `v2.4`  
+**Дата сборки:** `2026-10-27 10:18 UTC`
 
 ## Содержимое репозитория:
-* `firmware.bin` - Прошивка ESP32-C3 Web Bridge (`v2.2`)
+* `firmware.bin` - Прошивка ESP32-C3 Web Bridge (`v2.4`)
 * `littlefs.bin` - Веб-интерфейс LittleFS для ESP32-C3
 * `esp32_firmware.bin` - Прошивка классического ESP32 (WROOM/DevKit)
 * `esp32_littlefs.bin` - Веб-интерфейс LittleFS для классического ESP32
