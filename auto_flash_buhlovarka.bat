@@ -8,21 +8,21 @@ if not exist "%FW_DIR%" mkdir "%FW_DIR%"
 
 echo ===================================================================
 echo     Buhlovarka / HelloDistiller Firmware Flasher
-echo     Repository: github.com/geminibitok-oss/buhlovarka-release
+echo     Repository: github.com/geminibitok-oss/1test_buxlo
 echo ===================================================================
 echo.
 
 echo [1/2] Syncing latest firmware from GitHub...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$repo = 'https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main';" ^
+    "$sources = @('https://raw.githubusercontent.com/geminibitok-oss/1test_buxlo/release-binaries', 'https://github.com/geminibitok-oss/1test_buxlo/releases/latest/download', 'https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main');" ^
     "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
     "$wc = New-Object System.Net.WebClient;" ^
     "$wc.Headers.Add('User-Agent','Mozilla/5.0');" ^
-    "try { $remVer = $wc.DownloadString($repo + '/version.txt').Trim() } catch { $remVer = '' };" ^
+    "$remVer = ''; foreach($s in $sources) { if(-not $remVer) { try { $remVer = $wc.DownloadString($s + '/version.txt').Trim() } catch {} } };" ^
     "$locVer = if (Test-Path '%FW_DIR%\version.txt') { (Get-Content '%FW_DIR%\version.txt' -Raw).Trim() } else { '' };" ^
     "if ($remVer -and ($remVer -ne $locVer)) {" ^
     "    Write-Host ('[INFO] New version available on GitHub: ' + $remVer) -ForegroundColor Cyan;" ^
-    "    Remove-Item '%FW_DIR%\*.bin' -Force -ErrorAction SilentlyContinue;" ^
+    "    Remove-Item '%FW_DIR%\*.bin','%FW_DIR%\*.hex' -Force -ErrorAction SilentlyContinue;" ^
     "    [System.IO.File]::WriteAllText('%FW_DIR%\version.txt', $remVer);" ^
     "};" ^
     "$files = @('bootloader.bin', 'partitions.bin', 'firmware.bin', 'littlefs.bin', 'mega2560_firmware.hex');" ^
@@ -30,7 +30,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "    $dst = Join-Path '%FW_DIR%' $f;" ^
     "    if (-not (Test-Path $dst)) {" ^
     "        Write-Host ('  Downloading ' + $f + '...') -ForegroundColor Yellow;" ^
-    "        try { $wc.DownloadFile($repo + '/' + $f, $dst); Write-Host ('  [OK] ' + $f) -ForegroundColor Green } catch { Write-Host ('  [ERR] Failed ' + $f) -ForegroundColor Red }" ^
+    "        $ok = $false; foreach($s in $sources) { if(-not $ok) { try { $wc.DownloadFile($s + '/' + $f, $dst); if((Get-Item $dst).Length -gt 512) { $ok = $true; Write-Host ('  [OK] ' + $f + ' from ' + $s) -ForegroundColor Green } } catch {} } };" ^
+    "        if (-not $ok) { Write-Host ('  [ERR] Failed ' + $f) -ForegroundColor Red }" ^
     "    } else {" ^
     "        Write-Host ('  [OK] ' + $f + ' (ready)') -ForegroundColor Green" ^
     "    }" ^
