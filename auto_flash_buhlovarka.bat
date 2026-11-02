@@ -8,13 +8,13 @@ if not exist "%FW_DIR%" mkdir "%FW_DIR%"
 
 echo ===================================================================
 echo     Buhlovarka / HelloDistiller Firmware Flasher
-echo     Repository: github.com/geminibitok-oss/1test_buxlo
+echo     Repository: github.com/geminibitok-oss/buhlovarka-release
 echo ===================================================================
 echo.
 
 echo [1/2] Syncing latest firmware from GitHub...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$sources = @('https://raw.githubusercontent.com/geminibitok-oss/1test_buxlo/release-binaries', 'https://github.com/geminibitok-oss/1test_buxlo/releases/latest/download', 'https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main');" ^
+    "$sources = @('https://github.com/geminibitok-oss/buhlovarka-release/releases/latest/download', 'https://raw.githubusercontent.com/geminibitok-oss/buhlovarka-release/main');" ^
     "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
     "$wc = New-Object System.Net.WebClient;" ^
     "$wc.Headers.Add('User-Agent','Mozilla/5.0');" ^
